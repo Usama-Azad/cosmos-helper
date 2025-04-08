@@ -1,0 +1,41 @@
+{
+  "name": "cosmos-helper",
+  "version": "1.0.0",
+  "description": "Helper functions for Azure Cosmos DB",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "pack": "npm pack 2>&1",
+    "prepare": "npm run build",
+    "clean": "rimraf --glob dist dist-* *.tgz *.log package-lock.json",
+    "bundle": "npm run clean && npm install && npm run build && npm run pack"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "cosmosdb",
+    "cosmosdb-helper",
+    "query-builder",
+    "typescript",
+    "pagination",
+    "safe-queries"
+  ],
+  "author": "Usama Azad",
+  "repository": "github:Usama-Azad/cosmos-helper",
+  "homepage": "https://github.com/Usama-Azad/cosmos-helper/tree/main/README.md",
+  "bugs": {
+    "url": "https://github.com/Usama-Azad/cosmos-helper/issues"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "~5.8.2"
+  }
+}
