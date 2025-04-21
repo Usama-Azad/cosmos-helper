@@ -1,21 +1,41 @@
 import {
   Resource,
   Container,
+  Condition,
   BaseEntity,
   QueryOptions,
-  SimpleCondition,
   PaginationResult,
-  CompoundCondition,
 } from "./types";
+import { v4 as uuidv4 } from "uuid";
 import { QueryBuilder } from "./QueryBuilder";
+import { getObjectByKeys, objReplace } from "./helpers";
 
 type CosmosResource<T> = T & Resource;
 
 export abstract class BaseRepository<T extends BaseEntity> {
-  protected container: Container;
+  public container: Container;
 
   constructor(container: Container) {
     this.container = container;
+  }
+
+  async count(filters?: Condition<T>): Promise<number> {
+    let whereClause = "1=1";
+    let parameters: { name: string; value: any }[] = [];
+
+    if (filters) {
+      const builder = new QueryBuilder();
+      const built = builder.build(filters);
+      whereClause = built.whereClause;
+      parameters = built.parameters;
+    }
+
+    const query = `SELECT VALUE COUNT(1) FROM c WHERE ${whereClause}`;
+    const { resources } = await this.container.items
+      .query<number>({ query, parameters })
+      .fetchAll();
+
+    return resources[0];
   }
 
   async findById(id: string, partitionKey?: string): Promise<T> {
@@ -29,10 +49,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
     }
   }
 
-  async find(
-    filters?: SimpleCondition | CompoundCondition,
-    select?: string
-  ): Promise<T[]> {
+  async find(filters?: Condition<T>, select?: string): Promise<T[]> {
     // Validate and sanitize select fields
     select = select
       ? select
@@ -66,13 +83,51 @@ export abstract class BaseRepository<T extends BaseEntity> {
     return resources as T[];
   }
 
-  async create(item: T): Promise<T> {
+  async findFirst(
+    filters?: Condition<T>,
+    optionsOrSelect?: Omit<QueryOptions, "limit"> | string
+  ): Promise<T | null> {
+    // If optionsOrSelect is a string, it's a select clause
+    if (!optionsOrSelect || typeof optionsOrSelect === "string") {
+      const items = await this.find(filters, optionsOrSelect);
+      return items.length > 0 ? items[0] : null;
+    }
+    // Otherwise it's query options
+    else {
+      const items = await this.findWithPagination<T>(filters, {
+        ...optionsOrSelect,
+        limit: 1,
+      });
+      return items.items.length > 0 ? items.items[0] : null;
+    }
+  }
+
+  async create(
+    item: Partial<Pick<T, "id" | "createdAt" | "updatedAt" | "deletedAt">> &
+      Omit<T, "id" | "createdAt" | "updatedAt" | "deletedAt">,
+    options: { prefixId?: string; checkForExisting?: string } = {}
+  ): Promise<T> {
     try {
-      const now = new Date().toISOString();
+      if (options.checkForExisting) {
+        const existingItem = await this.findFirst(
+          getObjectByKeys(item as any, options.checkForExisting),
+          "id"
+        );
+        if (existingItem) {
+          throw new Error(`Item already exists`);
+        }
+      }
+
+      const date = new Date();
+      const now = date.toISOString();
+      const id = `${options.prefixId ? options.prefixId + "-" : ""}${uuidv4()}`;
+      const items = objReplace(item, { id, now });
       const itemWithDates = {
-        ...item,
+        ...{ id },
+        ...items,
         createdAt: now,
         updatedAt: now,
+        deletedAt: null,
       };
 
       const { resource } = await this.container.items.create(itemWithDates);
@@ -112,11 +167,12 @@ export abstract class BaseRepository<T extends BaseEntity> {
 
   async softDelete(id: string, partitionKey?: string): Promise<T> {
     try {
+      const now = new Date().toISOString();
       const existingItem = await this.findById(id, partitionKey);
       const deletedItem = {
         ...existingItem,
-        isDeleted: true,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
+        deletedAt: now,
       };
 
       const { resource } = await this.container
@@ -130,7 +186,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
   }
 
   async findWithPagination<T>(
-    filters?: SimpleCondition | CompoundCondition,
+    filters?: Condition<T>,
     options?: QueryOptions
   ): Promise<PaginationResult<T>> {
     const {
@@ -177,9 +233,11 @@ export abstract class BaseRepository<T extends BaseEntity> {
 
     return {
       items: resources as T[],
-      total,
-      limit,
-      offset,
+      pagination: {
+        total,
+        limit,
+        offset,
+      },
     };
   }
 }

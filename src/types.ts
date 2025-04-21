@@ -26,6 +26,11 @@ export interface CompoundCondition {
   conditions: (SimpleCondition | CompoundCondition)[];
 }
 
+export type Condition<T> =
+  | SimpleCondition
+  | CompoundCondition
+  | Partial<T>;
+
 export type Subquery = {
   type: "subquery";
   query: string;
@@ -42,9 +47,11 @@ export interface QueryOptions {
 
 export interface PaginationResult<T> {
   items: T[];
-  total: number;
-  limit: number;
-  offset: number;
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
 }
 
 export interface BaseEntity {

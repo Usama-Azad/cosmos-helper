@@ -1,17 +1,28 @@
 // src/QueryBuilder.ts
 
-import { CompoundCondition, SimpleCondition, Subquery } from "./types";
+import {
+  Subquery,
+  Condition,
+  SimpleCondition,
+  CompoundCondition,
+} from "./types";
+import { isSimpleOrCompoundCondition, x } from "./helpers";
 
 export class QueryBuilder {
   private parameters: { name: string; value: any }[] = [];
   private paramIndex = 0;
   private readonly MAX_STRING_LENGTH = 1000;
 
-  build(condition: SimpleCondition | CompoundCondition): {
+  build<T>(condition: Condition<T>): {
     whereClause: string;
     parameters: { name: string; value: any }[];
   } {
-    const whereClause = this.buildWhereClause(condition);
+    if (!isSimpleOrCompoundCondition(condition)) {
+      condition = x(condition);
+    }
+    const whereClause = this.buildWhereClause(
+      condition as SimpleCondition | CompoundCondition
+    );
     return { whereClause, parameters: this.parameters };
   }
 
@@ -68,7 +79,7 @@ export class QueryBuilder {
     if (condition.operator === "IN" || condition.operator === "NOT IN") {
       if (Array.isArray(condition.value)) {
         const inParams = condition.value
-          .map((_, idx) => `@${paramName}_${idx}`)
+          .map((_, idx) => `${paramName}_${idx}`)
           .join(", ");
         condition.value.forEach((val, idx) => {
           validateValue(val);

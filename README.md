@@ -2,14 +2,12 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-
 # Cosmos BaseRepository
 
 > 🚀 BaseRepository for Azure Cosmos DB  
-> Supports functions like `create`, `update`, `delete`, `find`, `findById` and `findWithPagination`.
+> Supports functions like `count`, `create`, `update`, `delete`, `find`, `findFirst`, `findById` and `findWithPagination`.
 
 ---
-
 
 # Cosmos Query Builder
 
@@ -34,8 +32,8 @@
 ## Install Locally
 
 ```bash
-npm install /path/to/cosmos-query-builder
-npm install /path/to/cosmos-query-builder/cosmos-query-builder-1.0.0.tgz
+npm install /path/to/cosmos-helper
+npm install /path/to/cosmos-helper/cosmos-helper-1.0.0.tgz
 ```
 
 ## Quick Usage
