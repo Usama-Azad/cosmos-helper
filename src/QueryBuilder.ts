@@ -7,6 +7,7 @@ import {
   CompoundCondition,
 } from "./types";
 import { isSimpleOrCompoundCondition, x } from "./helpers";
+import { allowedOperators, typeCheckingOperators } from "./consts";
 
 export class QueryBuilder {
   private parameters: { name: string; value: any }[] = [];
@@ -45,27 +46,18 @@ export class QueryBuilder {
       throw new Error(`Invalid field name: ${condition.field}`);
     }
 
-    const allowedOperators = [
-      "=",
-      "!=",
-      ">",
-      ">=",
-      "<",
-      "<=",
-      "IN",
-      "NOT IN",
-      "LIKE",
-      "IS NULL",
-      "IS NOT NULL",
-    ];
     if (allowedOperators.indexOf(condition.operator) === -1) {
       throw new Error(`Invalid operator: ${condition.operator}`);
     }
 
-    if (["IS NULL", "IS NOT NULL"].indexOf(condition.operator) !== -1) {
-      return `IS_DEFINED(c.${condition.field}) AND c.${condition.field} ${
-        condition.operator === "IS NULL" ? "IS NULL" : "IS NOT NULL"
-      }`;
+    if (
+      typeCheckingOperators.indexOf(
+        condition.operator.replace("IS_NOT_", "IS_")
+      ) !== -1
+    ) {
+      return `${
+        condition.operator.startsWith("IS_NOT_") ? "NOT " : ""
+      }${condition.operator.replace("IS_NOT_", "IS_")}(c.${condition.field})`;
     }
 
     const paramName = `@param${this.paramIndex++}`;

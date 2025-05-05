@@ -10,8 +10,26 @@ export type ConditionOperator =
   | "IN"
   | "NOT IN"
   | "LIKE"
-  | "IS NULL"
-  | "IS NOT NULL";
+  | "IS_BOOL"
+  | "IS_NULL"
+  | "IS_ARRAY"
+  | "IS_NUMBER"
+  | "IS_OBJECT"
+  | "IS_STRING"
+  | "IS_INTEGER"
+  | "IS_DEFINED"
+  | "IS_PRIMITIVE"
+  | "IS_FINITE_NUMBER"
+  | "IS_NOT_BOOL"
+  | "IS_NOT_NULL"
+  | "IS_NOT_ARRAY"
+  | "IS_NOT_NUMBER"
+  | "IS_NOT_OBJECT"
+  | "IS_NOT_STRING"
+  | "IS_NOT_INTEGER"
+  | "IS_NOT_DEFINED"
+  | "IS_NOT_PRIMITIVE"
+  | "IS_NOT_FINITE_NUMBER";
 
 export type LogicalOperator = "AND" | "OR";
 
@@ -26,10 +44,7 @@ export interface CompoundCondition {
   conditions: (SimpleCondition | CompoundCondition)[];
 }
 
-export type Condition<T> =
-  | SimpleCondition
-  | CompoundCondition
-  | Partial<T>;
+export type Condition<T> = SimpleCondition | CompoundCondition | Partial<T>;
 
 export type Subquery = {
   type: "subquery";
@@ -68,9 +83,16 @@ export interface Resource {
   [key: string]: any;
 }
 
+export type CosmosResource<T> = T & Resource;
+
 export interface QueryResponse<T> {
   resources: T[];
 }
+
+export type WhereClause = {
+  whereClause: string;
+  parameters: { name: string; value: any }[];
+};
 
 export declare class Container {
   items: {

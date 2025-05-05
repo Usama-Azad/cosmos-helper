@@ -1,8 +1,8 @@
 import {
-  Resource,
   Container,
   Condition,
   BaseEntity,
+  WhereClause,
   QueryOptions,
   PaginationResult,
 } from "./types";
@@ -10,25 +10,35 @@ import { v4 as uuidv4 } from "uuid";
 import { QueryBuilder } from "./QueryBuilder";
 import { getObjectByKeys, objReplace } from "./helpers";
 
-type CosmosResource<T> = T & Resource;
-
 export abstract class BaseRepository<T extends BaseEntity> {
   public container: Container;
+  private builder: QueryBuilder;
 
   constructor(container: Container) {
     this.container = container;
+    this.builder = new QueryBuilder();
+  }
+
+  private buildSelect(select?: string): string {
+    return select
+      ? select
+          .split(",")
+          .map((field) => field.trim())
+          .filter((field) => /^[a-zA-Z0-9_]+$/.test(field))
+          .map((field) => `c.${field}`)
+          .join(", ")
+      : "*";
+  }
+
+  private buildWhere(filters?: Condition<T>): WhereClause {
+    if (filters) {
+      return this.builder.build(filters);
+    }
+    return { whereClause: "1=1", parameters: [] };
   }
 
   async count(filters?: Condition<T>): Promise<number> {
-    let whereClause = "1=1";
-    let parameters: { name: string; value: any }[] = [];
-
-    if (filters) {
-      const builder = new QueryBuilder();
-      const built = builder.build(filters);
-      whereClause = built.whereClause;
-      parameters = built.parameters;
-    }
+    const { whereClause, parameters } = this.buildWhere(filters);
 
     const query = `SELECT VALUE COUNT(1) FROM c WHERE ${whereClause}`;
     const { resources } = await this.container.items
@@ -38,47 +48,25 @@ export abstract class BaseRepository<T extends BaseEntity> {
     return resources[0];
   }
 
-  async findById(id: string, partitionKey?: string): Promise<T> {
+  async findById<X extends T>(id: string, partitionKey?: string): Promise<X> {
     try {
       const { resource } = await this.container
         .item(id, partitionKey)
-        .read<CosmosResource<T>>();
-      return resource as T;
+        .read<X>();
+      return resource as X;
     } catch (error) {
       throw error;
     }
   }
 
   async find(filters?: Condition<T>, select?: string): Promise<T[]> {
-    // Validate and sanitize select fields
-    select = select
-      ? select
-          .split(",")
-          .map((field) => field.trim())
-          .filter((field) => {
-            // Sanitize field name to prevent SQL injection
-            if (!/^[a-zA-Z0-9_]+$/.test(field)) {
-              throw new Error(`Invalid characters in field name: ${field}`);
-            }
-            return true;
-          })
-          .map((field) => `c.${field}`)
-          .join(", ")
-      : "*";
+    const { whereClause, parameters } = this.buildWhere(filters);
 
-    let whereClause = "1=1";
-    let parameters: { name: string; value: any }[] = [];
-
-    if (filters) {
-      const builder = new QueryBuilder();
-      const built = builder.build(filters);
-      whereClause = built.whereClause;
-      parameters = built.parameters;
-    }
-
-    const query = `SELECT ${select} FROM c WHERE ${whereClause}`;
+    const query = `SELECT ${this.buildSelect(
+      select
+    )} FROM c WHERE ${whereClause}`;
     const { resources } = await this.container.items
-      .query<CosmosResource<T>>({ query, parameters })
+      .query<T>({ query, parameters })
       .fetchAll();
     return resources as T[];
   }
@@ -127,7 +115,6 @@ export abstract class BaseRepository<T extends BaseEntity> {
         ...items,
         createdAt: now,
         updatedAt: now,
-        deletedAt: null,
       };
 
       const { resource } = await this.container.items.create(itemWithDates);
@@ -197,28 +184,13 @@ export abstract class BaseRepository<T extends BaseEntity> {
       orderDirection = "desc",
     } = options || {};
 
-    const selectClause = select
-      ? select
-          .split(",")
-          .map((field) => field.trim())
-          .filter((field) => /^[a-zA-Z0-9_]+$/.test(field))
-          .map((field) => `c.${field}`)
-          .join(", ")
-      : "*";
+    const selectClause = this.buildSelect(select);
 
     if (!/^[a-zA-Z0-9_]+$/.test(orderBy)) {
       throw new Error(`Invalid characters in orderBy field name`);
     }
 
-    let whereClause = "1=1";
-    let parameters: { name: string; value: any }[] = [];
-
-    if (filters) {
-      const builder = new QueryBuilder();
-      const built = builder.build(filters);
-      whereClause = built.whereClause;
-      parameters = built.parameters;
-    }
+    const { whereClause, parameters } = this.buildWhere(filters as any);
 
     const countQuery = `SELECT VALUE COUNT(1) FROM c WHERE ${whereClause}`;
     const { resources: countResult } = await this.container.items
@@ -228,7 +200,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
 
     const query = `SELECT ${selectClause} FROM c WHERE ${whereClause} ORDER BY c.${orderBy} ${orderDirection.toUpperCase()} OFFSET ${offset} LIMIT ${limit}`;
     const { resources } = await this.container.items
-      .query<Resource>({ query, parameters })
+      .query<T>({ query, parameters })
       .fetchAll();
 
     return {
