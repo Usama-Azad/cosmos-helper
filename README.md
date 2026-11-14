@@ -88,3 +88,19 @@ const { condition } = new FluentQueryBuilder()
   .where("deletedAt", "IS NULL")
   .build();
 ```
+
+## Partition-Key Targeting
+
+Repository query methods accept an optional partition key so Cosmos DB can target a single partition:
+
+```ts
+await repository.count(filters, "tenant-123");
+await repository.find(filters, "id, status", "tenant-123");
+await repository.findFirst(filters, "id", "tenant-123");
+await repository.findWithPagination(filters, {
+  limit: 10,
+  partitionKey: "tenant-123",
+});
+```
+
+`findFirst` also accepts `partitionKey` in its options object when using pagination options. Omitting the partition key preserves cross-partition query behavior.

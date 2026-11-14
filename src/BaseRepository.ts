@@ -37,12 +37,15 @@ export abstract class BaseRepository<T extends BaseEntity> {
     return { whereClause: "1=1", parameters: [] };
   }
 
-  async count(filters?: Condition<T>): Promise<number> {
+  async count(filters?: Condition<T>, partitionKey?: string): Promise<number> {
     const { whereClause, parameters } = this.buildWhere(filters);
 
     const query = `SELECT VALUE COUNT(1) FROM c WHERE ${whereClause}`;
     const { resources } = await this.container.items
-      .query<number>({ query, parameters })
+      .query<number>(
+        { query, parameters },
+        partitionKey !== undefined ? { partitionKey } : undefined
+      )
       .fetchAll();
 
     return resources[0];
@@ -59,25 +62,33 @@ export abstract class BaseRepository<T extends BaseEntity> {
     }
   }
 
-  async find(filters?: Condition<T>, select?: string): Promise<T[]> {
+  async find(
+    filters?: Condition<T>,
+    select?: string,
+    partitionKey?: string
+  ): Promise<T[]> {
     const { whereClause, parameters } = this.buildWhere(filters);
 
     const query = `SELECT ${this.buildSelect(
       select
     )} FROM c WHERE ${whereClause}`;
     const { resources } = await this.container.items
-      .query<T>({ query, parameters })
+      .query<T>(
+        { query, parameters },
+        partitionKey !== undefined ? { partitionKey } : undefined
+      )
       .fetchAll();
     return resources as T[];
   }
 
   async findFirst(
     filters?: Condition<T>,
-    optionsOrSelect?: Omit<QueryOptions, "limit"> | string
+    optionsOrSelect?: Omit<QueryOptions, "limit"> | string,
+    partitionKey?: string
   ): Promise<T | null> {
     // If optionsOrSelect is a string, it's a select clause
     if (!optionsOrSelect || typeof optionsOrSelect === "string") {
-      const items = await this.find(filters, optionsOrSelect);
+      const items = await this.find(filters, optionsOrSelect, partitionKey);
       return items.length > 0 ? items[0] : null;
     }
     // Otherwise it's query options
@@ -85,6 +96,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
       const items = await this.findWithPagination<T>(filters, {
         ...optionsOrSelect,
         limit: 1,
+        partitionKey: partitionKey ?? optionsOrSelect.partitionKey,
       });
       return items.items.length > 0 ? items.items[0] : null;
     }
@@ -182,6 +194,7 @@ export abstract class BaseRepository<T extends BaseEntity> {
       offset = 0,
       orderBy = "createdAt",
       orderDirection = "desc",
+      partitionKey,
     } = options || {};
 
     const selectClause = this.buildSelect(select);
@@ -194,13 +207,19 @@ export abstract class BaseRepository<T extends BaseEntity> {
 
     const countQuery = `SELECT VALUE COUNT(1) FROM c WHERE ${whereClause}`;
     const { resources: countResult } = await this.container.items
-      .query<number>({ query: countQuery, parameters })
+      .query<number>(
+        { query: countQuery, parameters },
+        partitionKey !== undefined ? { partitionKey } : undefined
+      )
       .fetchAll();
     const total = countResult[0];
 
     const query = `SELECT ${selectClause} FROM c WHERE ${whereClause} ORDER BY c.${orderBy} ${orderDirection.toUpperCase()} OFFSET ${offset} LIMIT ${limit}`;
     const { resources } = await this.container.items
-      .query<T>({ query, parameters })
+      .query<T>(
+        { query, parameters },
+        partitionKey !== undefined ? { partitionKey } : undefined
+      )
       .fetchAll();
 
     return {

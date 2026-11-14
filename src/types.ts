@@ -58,6 +58,7 @@ export interface QueryOptions {
   offset?: number;
   orderBy?: string;
   orderDirection?: "asc" | "desc";
+  partitionKey?: string;
 }
 
 export interface PaginationResult<T> {
@@ -100,10 +101,13 @@ export declare class Container {
     query<T>(query: string): {
       fetchAll(): Promise<QueryResponse<T>>;
     };
+    query<T>(query: string, requestOptions?: { partitionKey?: string }): {
+      fetchAll(): Promise<QueryResponse<T>>;
+    };
     query<T>(options: {
       query: string;
       parameters: Array<{ name: string; value: any }>;
-    }): {
+    }, requestOptions?: { partitionKey?: string }): {
       fetchAll(): Promise<QueryResponse<T>>;
     };
   };
