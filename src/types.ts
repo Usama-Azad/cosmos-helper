@@ -46,12 +46,6 @@ export interface CompoundCondition {
 
 export type Condition<T> = SimpleCondition | CompoundCondition | Partial<T>;
 
-export type Subquery = {
-  type: "subquery";
-  query: string;
-  parameters?: { name: string; value: any }[];
-};
-
 export interface QueryOptions {
   select?: string;
   limit?: number;
@@ -89,30 +83,45 @@ export interface QueryResponse<T> {
   resources: T[];
 }
 
+export interface QueryParameter {
+  name: string;
+  value: any;
+}
+
+export interface QuerySpec {
+  query: string;
+  parameters: QueryParameter[];
+}
+
 export type WhereClause = {
   whereClause: string;
-  parameters: { name: string; value: any }[];
+  parameters: QueryParameter[];
 };
 
-export declare class Container {
+/**
+ * The value of a container's partition key. Every query and point operation
+ * names one: cross-partition queries are not supported.
+ */
+export type PartitionKey = string;
+
+/**
+ * The parts of an @azure/cosmos `Container` this package uses. A Cosmos
+ * `Container` satisfies it as is.
+ */
+export interface Container {
   items: {
-    create<T>(body: T, options?: any): Promise<any>;
-    query<T>(query: string): {
-      fetchAll(): Promise<QueryResponse<T>>;
-    };
-    query<T>(options: {
-      query: string;
-      parameters: Array<{ name: string; value: any }>;
-    }): {
-      fetchAll(): Promise<QueryResponse<T>>;
-    };
+    create(body: any, options?: any): Promise<{ resource?: any }>;
+    query<R = any>(
+      spec: QuerySpec,
+      options: { partitionKey: PartitionKey }
+    ): { fetchAll(): Promise<QueryResponse<R>> };
   };
-
-  item(id: string, partitionKeyValue?: any): Container;
-
-  read<T>(options?: any): Promise<any>;
-
-  replace(body: any, options?: any): Promise<any>;
-
-  delete(options?: any): Promise<any>;
+  item(
+    id: string,
+    partitionKey: PartitionKey
+  ): {
+    read<R = any>(options?: any): Promise<{ resource?: R; statusCode?: number }>;
+    replace(body: any, options?: any): Promise<{ resource?: any }>;
+    delete(options?: any): Promise<{ resource?: any }>;
+  };
 }
